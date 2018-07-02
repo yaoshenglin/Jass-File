@@ -25,6 +25,7 @@ unit targetUnit
 unit CoordUnit
 string filePath = "save\\YDWE\\Data.txt"
 hashtable HashTable = InitHashtable()
+integer array GameState
 
 constant integer D=StringHash("AIDummyState")
 integer E=0
@@ -2569,6 +2570,9 @@ integer I67=0
 hashtable IL7=InitHashtable()
 group I17=CreateGroup()
 real I07=1000.
+
+//native ShowTimedTextToPlayer	takes integer playerid, real duration, string message returns nothing
+
 endglobals
 
 //===========================================================================
@@ -22904,7 +22908,7 @@ function ConvertToPlayer takes integer playerNum returns player
 
     local player whichPlayer
     if ( playerNum < 1 or playerNum > 10 ) then
-        //输入不合法
+        // 不在返回范围
         return whichPlayer
     endif
 
@@ -22983,14 +22987,18 @@ function Trig_FunMode_Actions takes nothing returns nothing
 	call UnitAddAbility(CoordUnit, 'A0H5')	//增加500魔法上限
 	call UnitAddAbility(CoordUnit, 'A141')	//防御符文
 	//call CreateNUnitsAtLoc( 1, 'Hamg', Player(PLAYER_NEUTRAL_AGGRESSIVE), Location(0, 0), bj_UNIT_FACING )
-	call CreateNUnitsAtLoc( 1, 'ncp2', Player(neutralIndex1), Location(-7040.00, 6784.00), bj_UNIT_FACING)
+	call CreateNUnitsAtLoc( 1, 'ncp2', Player(neutralIndex1), Location(-7040.00, 6784.00), bj_UNIT_FACING)	//能量圈(较大)
 	
-	// 添加技能
+	// 添加技能,世界之树JE4，冰封王座JC4
 	call UnitAddAbilityBJ( 'A2OT', JE4 )
 	call UnitAddAbilityBJ( 'A2P4', JE4 )
+	call UnitAddAbilityBJ( 'A164', JE4 )
 	call UnitAddAbilityBJ( 'A2OT', JC4 )	//60%闪避
 	call UnitAddAbilityBJ( 'A2P4', JC4 )	//2%生命恢复
 	call UnitAddAbilityBJ( 'A164', JC4 )	//增加1000生命上限
+
+	call UnitAddAbilityBJ( 'A2P4', IY4 )	//生命之泉
+	call UnitAddAbilityBJ( 'A2P6', IY4 )
 
 	set tUnit = GroupPickRandomUnit(GetUnitsOfPlayerAndTypeId(Player(SelfIndex), 'ncop'))	//能量圈
 	call UnitAddAbility(KI4, 'A2OU')	//3%回蓝
@@ -23002,14 +23010,17 @@ function Trig_FunMode_Actions takes nothing returns nothing
 	call UnitAddAbility(CoordUnit, 'A2PF')	//焦土
 	call UnitAddAbility(CoordUnit, 'Avul')	//无敌
 
-	call AddAbilityA(J24)
-	call AddAbilityA(J_4)
-	call AddAbilityA(K44)
-	call AddAbilityA(JP4)
-	call AddAbilityA(JQ4)
+	call AddAbilityB(JM4)	//e00S,远古守护者 - 等级3
+	call AddAbilityB(JN4)	//e00S,远古守护者 - 等级3
+	call AddAbilityB(JO4)	//e00S,远古守护者 - 等级3
+	call AddAbilityA(JP4)	//e019,远古守护者 - 等级4
+	call AddAbilityA(JQ4)	//e019,远古守护者 - 等级4
 
-	call AddAbilityB(K74)
-	call AddAbilityB(K84)
+	call AddAbilityB(J24)	//u00N,幽魂塔 - 等级3
+	call AddAbilityB(J_4)	//u00N,幽魂塔 - 等级3
+	call AddAbilityB(K44)	//u00N,幽魂塔 - 等级3
+	call AddAbilityB(K74)	//u00T,幽魂塔 - 等级4
+	call AddAbilityB(K84)	//u00T,幽魂塔 - 等级4
 endfunction
 
 //===========================================================================
@@ -23144,7 +23155,6 @@ endfunction
 //===========================================================================
 function Trig_ContinueGame_Actions takes nothing returns nothing
     //继续游戏
-    call DisplayTimedTextToForce( bj_FORCE_ALL_PLAYERS, 5, "|cffff0000基地被催毁|r" )
     if DeathBaseIndex == 1 then
         // 世界之树被催毁
         set BaseCustomValue[1] = 1
@@ -23163,7 +23173,6 @@ function Trig_StopGame_Actions takes nothing returns nothing
     	// 冰封王座被催毁
     	call CK8()
     endif
-    call DisplayTimedTextToForce( bj_FORCE_ALL_PLAYERS, 5, "|cffff0000基地被催毁|r" )
 endfunction
 
 //===========================================================================
@@ -23925,12 +23934,88 @@ function Trig_RemoveTeleport_Actions takes nothing returns nothing
             call WaygateActivateBJ( false, tUnit )
             call PingMinimapLocForForceEx( bj_FORCE_PLAYER[SelfIndex], tPoint, 3.00, bj_MINIMAPPINGSTYLE_FLASHY, 100, 0.00, 0.00 )
         else
-            call DisplayTimedTextToForce( bj_FORCE_PLAYER[SelfIndex], 1.00, "TRIGSTR_064" )
+            call DisplayTimedTextToForce( bj_FORCE_PLAYER[SelfIndex], 1.00, GetUnitName(tUnit) + "|cff0042ff没有传送技能|r" )
         endif
     else
     endif
     set tUnit = null
     
+endfunction
+
+//===========================================================================
+// Trigger: AutoSkill
+//===========================================================================
+function Trig_AutoSkill_Conditions takes nothing returns boolean
+    return ((StringCase(GetEventPlayerChatString(), false) == "autoskill"))
+endfunction
+
+function Trig_AutoSkill_Actions takes nothing returns nothing
+    local group tGroup = GetUnitsSelectedAll(Player(SelfIndex))
+    local unit tUnit = GroupPickRandomUnit(tGroup)
+    local integer HeroLevel = GetUnitLevel(tUnit)
+    local integer AbilityID
+    local integer AbilityLevel
+    local integer sIndex = 0
+    local integer eIndex = 'zzzz'
+    
+    if CountUnitsInGroup(tGroup) == 1 and HeroLevel <= 30 then
+	    //call SelectHeroSkill( tUnit, 'A0AR' )
+	    if HeroLevel > 16 then
+		    set sIndex = 1
+		    set eIndex = 10
+		    loop
+		        exitwhen sIndex > eIndex
+		        // 加属性点
+		        call SelectHeroSkill( tUnit, 'Aamk' )
+		        
+		        set sIndex = sIndex + 1
+		    endloop
+	    endif
+    
+        if (GetHeroSkillPoints(tUnit) > 0) then
+	        set sIndex = 1
+		    loop
+		        exitwhen sIndex > 4
+
+				set AbilityID = 'A000'
+				set eIndex = 'Azzz'
+				loop
+			        exitwhen AbilityID > eIndex
+
+					set AbilityLevel = GetUnitAbilityLevel(tUnit, AbilityID)
+			        if GetUnitAbilityLevel(tUnit, AbilityID) < 4 and AbilityID != 'Aamk' then
+				        // 升级非属性点技能
+			            call SelectHeroSkill( tUnit, AbilityID )
+			        endif
+
+			        if GetUnitAbilityLevel(tUnit, AbilityID) > AbilityLevel then
+				        // 升级成功
+				        call SelectHeroSkill( tUnit, AbilityID )
+				        call SelectHeroSkill( tUnit, AbilityID )
+				        call SelectHeroSkill( tUnit, AbilityID )
+				        set AbilityLevel = GetUnitAbilityLevel(tUnit, AbilityID)
+				        //call ShowTimedTextToPlayer(SelfIndex, 2, "|cff0042ff当前|r" + I2S(AbilityID))
+				        //call ShowTimedTextToPlayer(SelfIndex, 2, "|cff0042ff学习技能|r" + GetAbilityName(AbilityID))
+			            call TriggerSleepAction(0.1)
+			        endif
+
+			        if GetHeroSkillPoints(tUnit) == 0 then
+				        // 无加成点则结束
+			            set AbilityID = eIndex
+			        endif
+					
+			        set AbilityID = AbilityID + 1
+			    endloop
+			    
+		        set sIndex = sIndex + 1
+		    endloop
+        endif
+    elseif CountUnitsInGroup(tGroup) > 1 then
+    	call DisplayTimedTextToForce( bj_FORCE_PLAYER[SelfIndex], 1.00, "|cff0042ff不允许这样操作|r" )
+    endif
+    
+    set tUnit = null
+    set tGroup = null
 endfunction
 
 //===========================================================================
@@ -23961,74 +24046,66 @@ function Trig_UnitAttack_Actions takes nothing returns nothing
 	//call DisplayTimedTextToForce( bj_FORCE_PLAYER[SelfIndex], 1.00, "被攻击单位" + GetUnitName(GetAttackedUnitBJ()) )
 endfunction
 
-function BaseDeathEvent takes nothing returns nothing
-	local unit tUnit = GetTriggerUnit()
-	local dialog tDialog
-	local trigger tTrigger
-	local button tButton1
-	local button tButton2
-	
-	if IsUnitAlly( tUnit, Player(TeamIndex1) ) then
-		//CI8,JE4
-		set DeathBaseIndex = 1
-	elseif IsUnitAlly( tUnit, Player(TeamIndex2)) then
-		//CK8,JC4
-		set DeathBaseIndex = 2
-	endif
-
-	//禁用战争迷雾
-    call FogEnableOff()
-
-	// 新建对话框
-	set tDialog = DialogCreate()
-    call DialogAddButtonWithHotkeyBJ( GetClickedDialogBJ(), "AAAAA", 'K' )
-    call DialogSetMessage( tDialog, "是否继续游戏" )
-    set tButton1 = DialogAddButtonBJ( tDialog, "继续游戏" )
-    set tButton2 = DialogAddButtonBJ( tDialog, "结束游戏" )
-    call DialogDisplayBJ( true, tDialog, Player(SelfIndex) )
-    //call DialogClear( tDialog )
-    //call DialogDestroy( tDialog )
-
-    set tTrigger = CreateTrigger()
-    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
-    call TriggerRegisterDialogButtonEvent( tTrigger, tButton1 )
-    call TriggerAddAction( tTrigger, function Trig_ContinueGame_Actions )
-    set tTrigger = null
-	set tTrigger = CreateTrigger()
-    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
-    call TriggerRegisterDialogButtonEvent( tTrigger, tButton2 )
-    call TriggerAddAction( tTrigger, function Trig_StopGame_Actions )
-    set tTrigger = null
-    
-endfunction
-
 //===========================================================================
-// Trigger: GetAbility
+// Trigger: EnableGetTech
 //===========================================================================
-function Trig_GetAbility_Conditions takes nothing returns boolean
+function Trig_EnableGetTech_Conditions takes nothing returns boolean
     if ( not ( IsUnitType(GetTriggerUnit(), UNIT_TYPE_HERO) == true ) ) then
-        return false
-    endif
-    if ( isCheck == false ) then
         return false
     endif
     return true
 endfunction
 
-function Trig_GetAbility_Actions takes nothing returns nothing
-    local unit TempUnit
+function Trig_EnableGetTech_Actions takes nothing returns nothing
+    local unit tUnit = GetTriggerUnit()
     local string TempText
-    local integer AbilityID = GetSpellAbilityId()
-    set TempUnit = GetTriggerUnit()
-    if ( AbilityID == 0 ) then
+    local integer HeroLevel
+    local integer AbilityID
+    local integer AbilityLevel1
+    local integer AbilityLevel2
+    local integer sIndex = 0
+    local integer eIndex = 'zzzz'
+
+    //call ShowTimedTextToPlayer( SelfIndex, 1, "测试升级技能" + I2S(GetPlayerId(GetOwningPlayer(tUnit))))
+    set HeroLevel = GetUnitLevel(tUnit)
+    if HeroLevel > 30 or GetPlayerId(GetOwningPlayer(tUnit)) < neutralIndex1 then
         return
+    elseif HeroLevel > 16 then
+    	// 加属性点
+    	call SelectHeroSkill( tUnit, 'Aamk' )
+    	return
     endif
 
-    set TempText = IntegerToASCIIString(AbilityID)
-    call DisplayTextToForce( bj_FORCE_PLAYER[SelfIndex], ( ( "|cff0042ff当前单位|r" + GetUnitName(TempUnit) ) + ( "|cff0042ff使用的技能|r" + GetAbilityName(AbilityID) ) ) )
-    call DisplayTextToForce( bj_FORCE_PLAYER[SelfIndex], ( "|cff0042ff技能ID|r" + TempText ) )
+	set sIndex = 'A000'
+	set eIndex = 'Azzz'
+    loop
+        exitwhen sIndex > eIndex
 
-    set TempUnit = null
+		set AbilityID = sIndex
+		set AbilityLevel1 = GetUnitAbilityLevel(tUnit, AbilityID)
+        if AbilityLevel1 < 4 then
+            call SelectHeroSkill( tUnit, AbilityID )
+        endif
+        set AbilityLevel2 = GetUnitAbilityLevel(tUnit, AbilityID)
+
+        if AbilityID == 'A0AR' then
+            call ShowTimedTextToPlayer(SelfIndex,3,"|cff0042ff是存在的|r" + I2S(AbilityLevel1) + "|cff0042ffcurrent|r" + I2S(AbilityLevel2))
+            call SelectHeroSkill( tUnit, AbilityID )
+        endif
+
+        if AbilityLevel2 > AbilityLevel1 and  GetHeroSkillPoints(tUnit) == 0 then
+	        // 升级成功则结束
+            set sIndex = eIndex
+        endif
+
+        set sIndex = sIndex + 1
+    endloop
+    
+	//set AbilityID = GetHeroSkillPoints(tUnit)
+	//call ShowTimedTextToPlayer(SelfIndex,3,"|cff0042ff剩余点数|r" + I2S(AbilityID))
+    //set TempText = IntegerToASCIIString(AbilityID)
+
+    set tUnit = null
 endfunction
 
 //===========================================================================
@@ -24097,6 +24174,7 @@ function Trig_UseAbility_Actions takes nothing returns nothing
 	    //驱逐魔法
         set tUnit = GroupPickRandomUnit(tGroup)
         if RectContainsLoc( RectFromCenterSizeBJ(tPoint, 300.00, 300.00), GetUnitRallyPoint(CoordUnit) ) then
+	        // 集结点在技能释放点周围300范围内时
         	set tArea = RectFromCenterSizeBJ(tPoint, 200.00, 200.00)
         	set TempValue = 0
         	set sIndex = 1
@@ -24105,18 +24183,20 @@ function Trig_UseAbility_Actions takes nothing returns nothing
             	exitwhen sIndex > eIndex or TempValue == 8
             	set rPoint = GetRandomLocInRect(tArea)
             	set rTree = RandomDestructableInRectSimpleBJ(RectFromCenterSizeBJ(rPoint, 30.00, 30.00))
+            	call DestructableRestoreLife( rTree, GetDestructableMaxLife(rTree), true )	//先复活试试
             	//call ShowTimedTextToPlayer( SelfIndex, 2, "|cff0042ff最大|r" + R2S(GetDestructableMaxLife(rTree)) + "|cff0042ff当前|r" + R2S(GetDestructableLife(rTree)))
             	if (IsDestructableAliveBJ(rTree) == false) then
 	            	//call DestructableRestoreLife( rTree, GetDestructableMaxLife(rTree), true )
 	            	set TempValue = TempValue + 1
                 	call CreateDestructableLoc( 'ATtr', rPoint, GetRandomDirectionDeg(), 1.00, 2 )
-                	call SetDestructableAnimation( GetLastCreatedDestructable(), "birth" )
             	else
             	endif
+            	call SetDestructableAnimation( GetLastCreatedDestructable(), "birth" )
             	set sIndex = sIndex + 1
         	endloop
 		endif
 		if targetUnit != null and tUnit == targetUnit then
+			// 选择的单位必须是锁定的单位
             if GetUnitAbilityLevelSwapped('Avul', tUnit) > 0 then
             	call UnitRemoveAbility( tUnit, 'Avul' )
         	else
@@ -24155,23 +24235,93 @@ function Trig_UseAbility_Actions takes nothing returns nothing
     elseif ( AbilityID == 'A2PF' ) then
     	//焦土
     	set tUnit = GroupPickRandomUnit(tGroup)
-        if tUnit != null then
+        if tUnit != null and tUnit != GetTriggerUnit() then
 	        call SetUnitState( tUnit, UNIT_STATE_LIFE, 0 )
             //call RemoveUnit(tUnit)
         endif
-
-		if RectContainsLoc( RectFromCenterSizeBJ(tPoint, 300.00, 300.00), GetUnitRallyPoint(CoordUnit) ) then
-		    //set tTree = GetUnitRallyDestructable(CoordUnit)
-        	//call RemoveDestructable(tTree)
-		endif
         
-        //call EnumDestructablesInCircleRectFromCenterSizeBJBJ( 512.00, tPoint, function Trig_UseAbilityFunc005Func002A )
-        //call PingMinimapLocForForceEx( GetPlayersAllies(Player(TeamIndex1)), tPoint, 1.0, bj_MINIMAPPINGSTYLE_FLASHY, 100, 0.00, 0.00 )
         call EnumDestructablesInRectAll( RectFromCenterSizeBJ(tPoint, 300.00, 300.00), function Trig_FilterUseAbilityEvent )
+    endif
+
+    if isCheck then
+	    set tUnit = GetTriggerUnit()
+        call DisplayTextToForce( bj_FORCE_PLAYER[SelfIndex], ( ( "|cff0042ff当前单位|r" + GetUnitName(tUnit) ) + ( "|cff0042ff使用的技能|r" + GetAbilityName(AbilityID) ) ) )
+    	call DisplayTextToForce( bj_FORCE_PLAYER[SelfIndex], ( "|cff0042ff技能ID|r" + IntegerToASCIIString(AbilityID) ) )
     endif
 
     set tUnit = null
     set tGroup = null
+endfunction
+
+//===========================================================================
+// function: BaseDeathEvent
+//===========================================================================
+function BaseDeathEvent takes nothing returns nothing
+	local unit tUnit = GetTriggerUnit()
+	local dialog tDialog
+	local trigger tTrigger
+	local button tButton1
+	local button tButton2
+	local string btnText = "胜利！"
+	
+	if tUnit == JE4 then
+		//CI8,JE4,世界之树
+		set DeathBaseIndex = 1
+		set GameState[1] = GameState[1] + 1
+		set btnText = "失败！"
+	elseif tUnit == JC4 then
+		//CK8,JC4,冰封王座
+		set DeathBaseIndex = 2
+		set GameState[2] = GameState[2] + 1
+	endif
+
+	call ShowTimedTextToPlayer( SelfIndex, 3.0, GetUnitName(tUnit) + "|cffff0000被催毁|r")
+
+	//禁用战争迷雾
+    call FogEnableOff()
+
+	// 新建对话框
+	set tDialog = DialogCreate()
+    call DialogAddButtonWithHotkeyBJ( GetClickedDialogBJ(), "AAAAA", 'K' )
+    if GameState[1] == 2 or GameState[2] == 2 then
+	    call DialogSetMessage( tDialog, "战役" )
+
+		set tButton1 = DialogAddButtonBJ( tDialog, btnText )
+        set tButton2 = DialogAddButtonBJ( tDialog, "结束游戏" )
+    	call DialogDisplayBJ( true, tDialog, Player(SelfIndex) )
+
+    	set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton1 )
+	    call TriggerAddAction( tTrigger, function Trig_StopGame_Actions )
+	    set tTrigger = null
+		set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton2 )
+	    call TriggerAddAction( tTrigger, function Trig_EndGame_Actions )
+	    set tTrigger = null
+    else
+    	call DialogSetMessage( tDialog, "战役" )
+    	set tButton1 = DialogAddButtonBJ( tDialog, "继续游戏" )
+
+    	set tButton2 = DialogAddButtonBJ( tDialog, btnText )
+    	call DialogDisplayBJ( true, tDialog, Player(SelfIndex) )
+
+    	set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton1 )
+	    call TriggerAddAction( tTrigger, function Trig_ContinueGame_Actions )
+	    set tTrigger = null
+		set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton2 )
+	    call TriggerAddAction( tTrigger, function Trig_StopGame_Actions )
+	    set tTrigger = null
+    endif
+    
+    //call DialogClear( tDialog )
+    //call DialogDestroy( tDialog )
+    
 endfunction
 
 //===========================================================================
@@ -24181,26 +24331,84 @@ function UnitDeadEvent takes nothing returns nothing
     local unit tUnit = GetTriggerUnit()
     local real tReal = 0.00
     local location tPoint
+    local timer tTimer
+    local timerdialog tTimerDialog
+
+    local dialog tDialog
+	local trigger tTrigger
+	local button tButton1
+	local button tButton2
+	local string btnText
+    
     if (IsUnitIllusionBJ(tUnit) == false) and (IsUnitType(tUnit, UNIT_TYPE_STRUCTURE) == true) and IsUnitEnemy(tUnit, Player(TeamIndex1)) then
     	// 贴上地皮
     	call SetBlightRectBJ( false, GetTriggerPlayer(), RectFromCenterSizeBJ(GetUnitLoc(tUnit), 2000.00, 2000.00) )
         call SetTerrainTypeBJ( GetUnitLoc(tUnit), 'Agrs', -1, 16, 0 )
     endif
-    if GetUnitTypeId(tUnit) == 'ndfl' then
-	   	//结束游戏，显示对话框，不显示排行榜
-	   	call CK8()
-    	//call CustomVictoryBJ( Player(SelfIndex), true, false )
+    if tUnit == JZ4 or tUnit == IY4 then
+	   	// 根据基地情况判断是否获得了胜利
+    	call ShowTimedTextToPlayer( SelfIndex, 3.0, GetUnitName(tUnit) + "|cffff0000被催毁|r")
+    	set btnText = "胜利！"
+    	if tUnit == JZ4 then
+	    	// 被污染的生命之泉
+	    	set GameState[2] = GameState[2] + 1
+	    	set DeathBaseIndex = 2
+    	    if IsUnitAliveBJ(JC4) then
+    	    	return
+    		endif
+    	elseif tUnit == IY4 then
+    		// 生命之泉
+    		set GameState[1] = GameState[1] + 1
+    		set DeathBaseIndex = 1
+    		if IsUnitAliveBJ(JE4) then
+    	    	return
+    		endif
+
+    		set btnText = "失败！"
+    	endif
+
+    	// 新建对话框
+		set tDialog = DialogCreate()
+	    call DialogAddButtonWithHotkeyBJ( GetClickedDialogBJ(), "AAAAA", 'K' )
+	    call DialogSetMessage( tDialog, "战役" )
+	    set tButton1 = DialogAddButtonBJ( tDialog, btnText )
+	    set tButton2 = DialogAddButtonBJ( tDialog, "退出战役" )
+	    call DialogDisplayBJ( true, tDialog, Player(SelfIndex) )
+	    //call DialogClear( tDialog )
+	    //call DialogDestroy( tDialog )
+
+	    set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton1 )
+	    call TriggerAddAction( tTrigger, function Trig_StopGame_Actions )
+	    set tTrigger = null
+		set tTrigger = CreateTrigger()
+	    //call TriggerRegisterTrackableTrackEvent( tTrigger, GetTriggeringTrackable() )
+	    call TriggerRegisterDialogButtonEvent( tTrigger, tButton2 )
+	    call TriggerAddAction( tTrigger, function Trig_EndGame_Actions )
+	    set tTrigger = null
 	endif
 	if IsUnitIllusionBJ(tUnit) == false and IsUnitType(tUnit, UNIT_TYPE_HERO) and GetOwningPlayer(tUnit) == Player(neutralIndex1) then
 	    // 中立敌对的英雄死亡时
-	    set tReal = I2R(GetHeroLevel(tUnit)) * 4.0 - 0.1
+	    set tReal = I2R(GetHeroLevel(tUnit)) * 4.0 - 1.0
 	    //set tReal = (tReal - 1.0) * 4.0 + TestReal
         set tReal = RMinBJ(300.00, tReal)
+
+		set tTimer = CreateTimer()
+    	set tTimerDialog = CreateTimerDialogBJ( tTimer, ( GetUnitName(tUnit) + "复活" ) )
+    	call TimerDialogDisplayForPlayerBJ( true, tTimerDialog, Player(SelfIndex) )
+    	call StartTimerBJ( tTimer, false, tReal )
+        
         call TriggerSleepAction(tReal)
         set tPoint = LoadLocationHandleBJ(StringHashBJ("StartPoint"), StringHashBJ(GetHeroProperName(tUnit)), HashTable)
         call ReviveHeroLoc( tUnit, tPoint, true )
         call PingMinimapLocForForceEx( bj_FORCE_PLAYER[SelfIndex], tPoint, 3.00, bj_MINIMAPPINGSTYLE_FLASHY, 100, 0.00, 0.00 )
         call SetUnitPositionLoc( tUnit, tPoint )
+
+		call DestroyTimer(tTimer)
+    	call DestroyTimerDialog( tTimerDialog )
+    	set tTimer = null
+    	set tTimerDialog = null
         //if IsUnitDeadBJ(tUnit) then
         //endif
         //call YM8()默认复活器
@@ -24309,40 +24517,42 @@ function Trig_ShowGold_Conditions takes nothing returns boolean
     return true
 endfunction
 
-function Trig_ShowGold_Actions takes nothing returns nothing
+function FilterHeroUnit takes nothing returns boolean
+	return ((IsUnitType(GetFilterUnit(), UNIT_TYPE_HERO) == true))
+endfunction
 
-    local player iPlayer
+function Trig_ShowGold_Actions takes nothing returns nothing
+	local unit tUnit = GroupPickRandomUnit(GetUnitsSelectedAll(Player(SelfIndex)))
+    local player tPlayer = GetOwningPlayer(tUnit)
     local string playerName
-    local integer PlayerGameID
     local integer TempValue
     local string TempText
     call SplitString()
-    set PlayerIndex = 1
+    set PlayerIndex = -1
     set TempText = LoadStringBJ(2, StringHashBJ("TDS"), HashTable)
 
     if ( StringLength(TempText) > 0 ) then
-        if ( S2I(TempText) > 0 and S2I(TempText) <= 16 ) then
+	    // 若指定了玩家编号
+        if ( S2I(TempText) >= 0 and S2I(TempText) <= neutralIndex4 ) then
             //若指定了玩家，则设置指定玩家
-            set PlayerIndex = S2I(LoadStringBJ(2, StringHashBJ("TDS"), HashTable))
+            set PlayerIndex = S2I(TempText)
         else
             //输入不合法
             call DisplayTextToForce( GetPlayersAll(), ( "|cffff0000输入不合法|r" ) )
-            return
         endif
+    elseif tUnit != null then
+        //选中的单位所属玩家
+        set PlayerIndex = GetPlayerId(tPlayer)
     endif
 
-    //获取玩家黄金数
-    set iPlayer = ConvertToPlayer(PlayerIndex)
-    set TempValue = GetPlayerState(iPlayer, PLAYER_STATE_RESOURCE_GOLD)
-    set PlayerGameID = ConvertPlayerGameID(iPlayer)
-    set playerName = I2S(PlayerGameID)
-    if ( PlayerGameID == 1 ) then
-        set playerName = GetPlayerName(iPlayer)
-    elseif ( PlayerGameID == 0 ) then
-        call DisplayTextToForce( GetPlayersAll(), "|cffff0000输入超出范围|r" )
-        return
+    if PlayerIndex >= 0 then
+        //获取玩家黄金数
+        set tPlayer = Player(PlayerIndex)
+        set TempValue = GetPlayerState(tPlayer, PLAYER_STATE_RESOURCE_GOLD)
+        set playerName = GetPlayerName(tPlayer)
+
+	    call DisplayTextToForce( GetPlayersAll(), ("|cff0042ff玩家|r" + playerName + "|cff0042ff拥有黄金|r" + I2S(TempValue) ) )
     endif
-    call DisplayTextToForce( GetPlayersAll(), ("|cff0042ff玩家|r" + playerName + "|cff0042ff拥有黄金|r" + I2S(TempValue) ) )
 
     call FlushChildHashtableBJ( StringHashBJ("TDS"), HashTable )
 endfunction
@@ -24359,12 +24569,12 @@ function Trig_Gold_Conditions takes nothing returns boolean
 endfunction
 
 function Trig_Gold_Actions takes nothing returns nothing
-
-    local player iPlayer
+	local unit tUnit = GroupPickRandomUnit(GetUnitsSelectedAll(Player(SelfIndex)))
+    local player tPlayer = GetOwningPlayer(tUnit)
+    local string playerName
     local integer TempValue
     local string TempText
     call SplitString()
-    set PlayerIndex = 1
     set TempText = LoadStringBJ(2, StringHashBJ("TDS"), HashTable)
 
     if ( StringLength(TempText) <= 0 ) then
@@ -24375,26 +24585,21 @@ function Trig_Gold_Actions takes nothing returns nothing
 
     set TempValue = S2I(TempText)
     if ( TempValue <= 0 ) then
-        //输入不合法
+        //请输入合法的数字
         call DisplayTextToForce( GetPlayersAll(), ( "|cffff0000输入不合法|r" ) )
         return
     endif
 
-    if ( LoadStringBJ(3, StringHashBJ("TDS"), HashTable) == "for" ) then
-        if ( S2I(LoadStringBJ(4, StringHashBJ("TDS"), HashTable)) > 0 and S2I(LoadStringBJ(4, StringHashBJ("TDS"), HashTable)) < 11 ) then
-            //若指定了玩家，则设置指定玩家
-            set PlayerIndex = S2I(LoadStringBJ(4, StringHashBJ("TDS"), HashTable))
-        else
-            //输入不合法
-            call DisplayTextToForce( GetPlayersAll(), ( "|cffff0000输入不合法|r" ) )
-            return
-        endif
+    if ( tUnit == null ) then
+        //输入不合法
+        call DisplayTextToForce( GetPlayersAll(), ( "|cffff0000请选择一个玩家单位再操作|r" ) )
+        return
     endif
 
     //添加黄金给玩家
-    set iPlayer = ConvertToPlayer(PlayerIndex)
-    call AdjustPlayerStateBJ( TempValue, iPlayer, PLAYER_STATE_RESOURCE_GOLD )
-    call DisplayTextToForce( GetPlayersAll(), ("|cff0042ff玩家|r" + I2S(PlayerIndex) + "|cff0042ff获得黄金|r" + I2S(TempValue) ) )
+    set playerName = GetPlayerName(tPlayer)
+    call AdjustPlayerStateBJ( TempValue, tPlayer, PLAYER_STATE_RESOURCE_GOLD )
+    call DisplayTextToForce( GetPlayersAll(), ("|cff0042ff玩家|r" + playerName + "|cff0042ff获得黄金|r" + I2S(TempValue) ) )
 
     call FlushChildHashtableBJ( StringHashBJ("TDS"), HashTable )
 endfunction
@@ -25103,6 +25308,7 @@ function Trig_AutoHero_Actions takes nothing returns nothing
         return
     endif
 
+	call ShowTimedTextToPlayer( SelfIndex, 3.0, "|cff00ff00自动选择英雄|r" )
     set isPickHero = true
 
     set index = 1
@@ -25386,11 +25592,11 @@ function Trig_RefreshWild_Conditions takes nothing returns boolean
     return ( GetUnitTypeId(GetFilterUnit()) == tInt )
 endfunction
 
-function FileNotStructureUnit takes nothing returns boolean
+function FilterNotStructureUnit takes nothing returns boolean
     return ((IsUnitType(GetFilterUnit(), UNIT_TYPE_STRUCTURE) == false))
 endfunction
 
-function FileSpecifiedUnit takes nothing returns boolean
+function FilterSpecifiedUnit takes nothing returns boolean
     local unit tUnit = GetFilterUnit()
     if GetUnitTypeId(tUnit) == 'n00L' and GetOwningPlayer(tUnit) == Player(neutralIndex3) then
         return true
@@ -25423,7 +25629,7 @@ function Trig_RefreshWild_Actions takes nothing returns nothing
     loop
         exitwhen sIndex > eIndex
         set tUnit = GroupPickRandomUnit(tGroup)
-        set tGroupNext = GetUnitsInRangeOfLocMatching(768.00, GetUnitLoc(tUnit), Condition(function FileNotStructureUnit))
+        set tGroupNext = GetUnitsInRangeOfLocMatching(768.00, GetUnitLoc(tUnit), Condition(function FilterNotStructureUnit))
         if CountUnitsInGroup(tGroupNext) < 2 then
 	        // 远古九头蛇
             call CreateNUnitsAtLoc( 5, 'n00D', Player(neutralIndex1), GetUnitLoc(tUnit), bj_UNIT_FACING )
@@ -25438,7 +25644,7 @@ function Trig_RefreshWild_Actions takes nothing returns nothing
     loop
         exitwhen sIndex > eIndex
         set tUnit = GroupPickRandomUnit(tGroup)
-        set tGroupNext = GetUnitsInRangeOfLocMatching(768.00, GetUnitLoc(tUnit), Condition(function FileSpecifiedUnit))
+        set tGroupNext = GetUnitsInRangeOfLocMatching(768.00, GetUnitLoc(tUnit), Condition(function FilterSpecifiedUnit))
         if CountUnitsInGroup(tGroupNext) < 1 then
 	        // Roshan
             call CreateNUnitsAtLoc( 5, 'n00L', Player(neutralIndex3), GetUnitLoc(tUnit), bj_UNIT_FACING )
@@ -122678,19 +122884,24 @@ function main takes nothing returns nothing
 	call TriggerAddCondition( iTrigger, Condition( function Trig_RemoveTeleport_Conditions ) )
 	call TriggerAddAction( iTrigger, function Trig_RemoveTeleport_Actions )
 	set iTrigger=null
+	set iTrigger=CreateTrigger()
+	call TriggerRegisterPlayerChatEvent( iTrigger, Player(SelfIndex), "AutoSkill", false )
+	call TriggerAddCondition( iTrigger, Condition( function Trig_AutoSkill_Conditions ) )
+	call TriggerAddAction( iTrigger, function Trig_AutoSkill_Actions )
+	set iTrigger=null
 	set iTrigger = CreateTrigger()
 	call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_ATTACKED )
 	call TriggerAddAction( iTrigger, function Trig_UnitAttack_Actions )
 	set iTrigger = null
 	set iTrigger=CreateTrigger()
-	call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_CAST )
+	call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_HERO_LEVEL )
 	//call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_HERO_SKILL )
 	//call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_CHANNEL )
 	//call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_ENDCAST )
 	//call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_EFFECT )
 	//call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_FINISH )
-	call TriggerAddCondition( iTrigger, Condition( function Trig_GetAbility_Conditions ) )
-	call TriggerAddAction( iTrigger, function Trig_GetAbility_Actions )
+	call TriggerAddCondition( iTrigger, Condition( function Trig_EnableGetTech_Conditions ) )
+	call TriggerAddAction( iTrigger, function Trig_EnableGetTech_Actions )
 	set iTrigger=null
 	set iTrigger=CreateTrigger()
 	call TriggerRegisterAnyUnitEventBJ( iTrigger, EVENT_PLAYER_UNIT_SPELL_CAST )
@@ -122820,10 +123031,10 @@ function main takes nothing returns nothing
 	//call DisplayTimedTextToForce(GetPlayersAll(),5,"|cff0042ff读取存档|r" + filePath)
 	if GetPlayerTechMaxAllowed(Player(PLAYER_NEUTRAL_PASSIVE-1), 0) == 1 then
 	    set tString = GetPlayerName(Player(PLAYER_NEUTRAL_PASSIVE))
-	    call DisplayTimedTextToForce(GetPlayersAll(),5,"|cff0042ff读取存档|r" + tString)
+	    //call DisplayTimedTextToForce(GetPlayersAll(),5,"|cff0042ff读取存档|r" + tString)
 	else
 	    set tString = "Hlgr,UC18,Hvwd,H000,E01B,AAAAA,Ulic,NC00,H001,O00J,Nbrn"
-		call DisplayTimedTextToForce(GetPlayersAll(),5,"|cffff0000读取存档失败|r")
+		//call DisplayTimedTextToForce(GetPlayersAll(),5,"|cffff0000读取存档失败|r")
 	endif
 
 
